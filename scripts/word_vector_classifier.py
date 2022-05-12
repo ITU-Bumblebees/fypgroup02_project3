@@ -16,6 +16,9 @@ from sklearn.ensemble import RandomForestClassifier
 #sklearn.feature_extraction.text.TfidfTransformer
 #huggingface transformers and recurring neural network analysis
 
+#NOTES
+#deleting stop words makes the hate one worse, but the abortion one better
+
 
 class getVectorClassifier():
     def __init__(self, train_text_path, train_labels_path):
@@ -59,7 +62,7 @@ class getVectorClassifier():
             
         #     train_x_corrected.append(str(tw.correct()))
 
-        temp = [self.nlp(text) for text in self.train_x] #works as a tokenizer, lemmatizer etc. all in one
+        temp = [self.nlp(text) for text in train_x_processed] #works as a tokenizer, lemmatizer etc. all in one
         train_x_vectors = [x.vector for x in temp] #turns the spacy objects from the step before into vectors
 
         #use the vectors to train a support vector classifier
@@ -80,13 +83,13 @@ class getVectorClassifier():
             val_y = [int(line) for line in infile]
 
         
-        # stopwords_processed = self.getStopWords()
-        # pattern = re.compile(r'\b(' +r'|'.join(stopwords_processed) +r')\b\s')
-        # val_x_processed = []
-        # for line in val_x:
-        #     val_x_processed.append(pattern.sub('', line))
+        stopwords_processed = self.getStopWords()
+        pattern = re.compile(r'\b(' +r'|'.join(stopwords_processed) +r')\b\s')
+        val_x_processed = []
+        for line in val_x:
+            val_x_processed.append(pattern.sub('', line))
 
-        val_temp = [self.nlp(text) for text in val_x]
+        val_temp = [self.nlp(text) for text in val_x_processed]
         val_x_vectors = [x.vector for x in val_temp]
         predictions = self.clf_svm.predict(val_x_vectors)
 
@@ -119,7 +122,7 @@ class bagOfWordsClassifier():
  
         tw_tokenizer = TweetTokenizer(strip_handles=True, reduce_len=True)
 
-        self.vectorizer = CountVectorizer(binary=True, tokenizer=lambda text: tw_tokenizer.tokenize(text))
+        self.vectorizer = CountVectorizer( tokenizer=lambda text: tw_tokenizer.tokenize(text)) #deleted binary=True when running with abortion data
         train_x_vectors = self.vectorizer.fit_transform(train_x_processed)
 
         clf_svm = svm.SVC(kernel='linear')
@@ -136,7 +139,7 @@ class bagOfWordsClassifier():
         val_x_vectors = self.vectorizer.transform(val_x)
         predictions = self.clf_svm.predict(val_x_vectors)
 
-        return f1_score(predictions, val_y)
+        return f1_score(predictions, val_y, average = 'macro')
 
     def returnClassifier(self):
         return self.clf_svm
@@ -166,7 +169,7 @@ class RandomForest():
 
         tw_tokenizer = TweetTokenizer(strip_handles=True, reduce_len=True)
 
-        self.vectorizer = CountVectorizer(binary=True, tokenizer=lambda text: tw_tokenizer.tokenize(text))
+        self.vectorizer = CountVectorizer(tokenizer=lambda text: tw_tokenizer.tokenize(text)) #deleted binary=True when running with abortion data
         train_x_vectors = self.vectorizer.fit_transform(train_x_processed)
         rf_clf = RandomForestClassifier(criterion='entropy')
         rf_clf.fit(train_x_vectors, self.train_y)
@@ -190,13 +193,13 @@ class RandomForest():
         val_x_vectors = self.vectorizer.transform(val_x_processed)
         predictions = self.rf_clf.predict(val_x_vectors)
 
-        return f1_score(predictions, val_y)
-
+        return f1_score(predictions, val_y, average = 'macro')
 
 
 def main():
     #create nlp model
     nlp = spacy.load('en_core_web_lg')
+    
 
     #paths for the training and validation data
     train_text_path = './dataset/hate/train_text.txt'
@@ -204,18 +207,22 @@ def main():
     val_text_path = './dataset/hate/val_text.txt'
     val_labels_path = './dataset/hate/val_labels.txt'
 
+    train_abortion_text = './dataset/stance/abortion/train_text.txt'
+    train_abortion_labels = './dataset/stance/abortion/train_labels.txt'
+    val_abortion_text = './dataset/stance/abortion/val_text.txt'
+    val_abortion_labels = './dataset/stance/abortion/val_labels.txt'
+
     #create a classifier using the vector classifier class
-    # vec_classifier = getVectorClassifier(train_text_path, train_labels_path)
-    # clf_svm = vec_classifier.returnClassifier()
-    # print(vec_classifier.getClassifierAccuracy(val_text_path, val_labels_path))
+    vec_classifier = getVectorClassifier(train_abortion_text, train_abortion_labels)
+    print(f'f1 score of the vector classifier: {vec_classifier.getClassifierAccuracy(val_abortion_text, val_abortion_labels)}')
 
     #create a classifier using the bag of words class
-    bag_classifier = bagOfWordsClassifier(train_text_path, train_labels_path)
-    print(bag_classifier.getClassifierAccuracy(val_text_path, val_labels_path))
+    bag_classifier = bagOfWordsClassifier(train_abortion_text, train_abortion_labels)
+    print(f'f1 score of the bag of words classifier: {bag_classifier.getClassifierAccuracy(val_abortion_text, val_abortion_labels)}')
 
     #create a random forest classifier using the random forest class
-    # forest_classifier = RandomForest(train_text_path, train_labels_path)
-    # print(forest_classifier.getAccuracy(val_text_path, val_labels_path))
+    forest_classifier = RandomForest(train_abortion_text, train_abortion_labels)
+    print(f'f1 score of the random forest classifier: {forest_classifier.getAccuracy(val_abortion_text, val_abortion_labels)}')
 
 
 if __name__ == '__main__':
