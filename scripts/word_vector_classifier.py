@@ -4,7 +4,7 @@ import numpy as np
 from nltk.corpus import stopwords
 from nltk.tokenize import TweetTokenizer
 from textblob import TextBlob
-import re
+import re, string
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import f1_score
 from sklearn.ensemble import RandomForestClassifier
@@ -28,13 +28,24 @@ class getVectorClassifier():
 
     def getTrainSets(self):
         """ get both the train text and the labels for the training set """
-        with open(self.train_text_path, 'r', encoding='utf-8') as infile:
-            train_x = [line.strip() for line in infile]
+        # with open(self.train_text_path, 'r', encoding='utf-8') as infile:
+        #     train_x = [line.strip() for line in infile]
 
         with open(self.train_labels_path, 'r') as infile:
             train_y = [int(line) for line in infile]
 
+        train_x= []
+        punctuation= string.punctuation 
+
+        with open(self.train_text_path, 'r', encoding='UTF-8') as infile:
+            for line in infile:
+                stop_words = stopwords.words("english")
+                pattern = re.compile(r'\b(' +r'|'.join(stop_words) +r')\b\s')
+                line = pattern.sub('', line)
+                train_x.append(line)
+
         return train_x, train_y
+
 
     def getStopWords(self):
         """ returns a list of english stopwords """
@@ -44,11 +55,11 @@ class getVectorClassifier():
         """ uses the training data, 
         processes it by deleting stopwords and tokenizing as well as vectorizing the sentence, 
         returns a classifier """
-        stop_words = self.getStopWords()
-        pattern = re.compile(r'\b(' +r'|'.join(stop_words) +r')\b\s')
-        train_x_processed = []
-        for line in self.train_x:
-            train_x_processed.append(pattern.sub('', line))
+        # stop_words = self.getStopWords()
+        # pattern = re.compile(r'\b(' +r'|'.join(stop_words) +r')\b\s')
+        # train_x_processed = []
+        # for line in self.train_x:
+        #     train_x_processed.append(pattern.sub('', line))
 
         # train_x_corrected = []
         # c = 0
@@ -73,18 +84,18 @@ class getVectorClassifier():
 
     def getClassifierAccuracy(self, val_x_path, val_y_path):
         """ use the validation set to get the f1 score of the model """
+        val_x=[]
+        punctuation= string.punctuation 
         with open(val_x_path, 'r', encoding= 'utf-8') as infile:
-            val_x = [line.strip() for line in infile]
+        #     val_x = [line.strip() for line in infile]
+            for line in infile:
+                stop_words = stopwords.words("english")
+                pattern = re.compile(r'\b(' +r'|'.join(stop_words) +r')\b\s')
+                line = pattern.sub('', line)
+                val_x.append(line)
 
         with open(val_y_path, 'r') as infile:
             val_y = [int(line) for line in infile]
-
-        
-        # stopwords_processed = self.getStopWords()
-        # pattern = re.compile(r'\b(' +r'|'.join(stopwords_processed) +r')\b\s')
-        # val_x_processed = []
-        # for line in val_x:
-        #     val_x_processed.append(pattern.sub('', line))
 
         val_temp = [self.nlp(text) for text in val_x]
         val_x_vectors = [x.vector for x in val_temp]
