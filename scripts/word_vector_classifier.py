@@ -9,7 +9,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import f1_score
 from sklearn.ensemble import RandomForestClassifier
 
-#python -m spacy download en_core_web_sm needs to be run in the terminal before running this
+#python -m spacy download en_core_web_lg needs to be run in the terminal before running this
 #python -m nltk.downloader stopwords needs to be run in the terminal before running this
 
 #THINGS TO LOOK INTO
