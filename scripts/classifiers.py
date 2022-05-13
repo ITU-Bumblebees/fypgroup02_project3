@@ -29,12 +29,12 @@ class WithStopVectorClassifier:
         """ initialize the self variables as well as get the training sets and the classifier"""
         self.train_text_path = train_text_path
         self.train_labels_path = train_labels_path
-        self.nlp = spacy.load('en_core_web_lg')
+        self.nlp = spacy.load('en_core_web_lg')  #load in the pre-trained pipeline from spacy
         self.train_x, self.train_y = self.getTrainSets()
         self.clf_svm = self.trainWordVector()
 
     def getTrainSets(self):
-        """ get both the train text and the labels for the training set """
+        """ load in the train data set, train_x has the text and train_y the labels """
         with open(self.train_text_path, 'r', encoding='utf-8') as infile:
             train_x = [line.strip() for line in infile]
 
@@ -45,13 +45,13 @@ class WithStopVectorClassifier:
 
     def trainWordVector(self):
         """ processes the training data by using the spacy pipeline, 
-        then turns it into a support vector classifier """
+        then turns it into a fully trained support vector classifier """
 
-        temp = [self.nlp(text) for text in self.train_x] #works as a tokenizer, lemmatizer etc. all in one
+        temp = [self.nlp(tweet) for tweet in self.train_x] #works as a tokenizer, lemmatizer etc. all in one
         train_x_vectors = [x.vector for x in temp] #turns the spacy objects from the step before into vectors
 
         #use the vectors to train a support vector classifier
-        clf_svm = svm.SVC(kernel='linear')
+        clf_svm = svm.SVC(kernel='linear') #we use a linear kernel bc we found that it is the best one
         clf_svm.fit(train_x_vectors, self.train_y)
         return clf_svm 
 
@@ -80,7 +80,7 @@ class NoStopVectorClassifier:
         """ initialize the self variables as well as get the training sets and the classifier"""
         self.train_text_path = train_text_path
         self.train_labels_path = train_labels_path
-        self.nlp = spacy.load('en_core_web_lg')
+        self.nlp = spacy.load('en_core_web_lg')  #load in the pre-trained pipeline from spacy
         self.train_x, self.train_y = self.getTrainSets()
         self.clf_svm = self.trainWordVector()
 
@@ -95,13 +95,14 @@ class NoStopVectorClassifier:
         return train_x, train_y
 
     def trainWordVector(self):
-        """ uses the training data, 
-        processes it by deleting stopwords and tokenizing as well as vectorizing the sentence, 
-        returns a classifier """
+        """ uses the training data, processes it by deleting stopwords, 
+        returns a trained classifier """
+
+        #create a new list with processed tweets that do not have stopwords
         self.pattern = re.compile(r'\b(' +r'|'.join(stopwords.words('english')) +r')\b\s')
         train_x_processed = []
         for line in self.train_x:
-            train_x_processed.append(pattern.sub('', line))
+            train_x_processed.append(self.pattern.sub('', line))
 
         temp = [self.nlp(text) for text in train_x_processed] #works as a tokenizer, lemmatizer etc. all in one
         train_x_vectors = [x.vector for x in temp] #turns the spacy objects from the step before into vectors
@@ -123,12 +124,16 @@ class NoStopVectorClassifier:
         with open(val_y_path, 'r') as infile:
             val_y = [int(line) for line in infile]
 
+        #deleting stopwords
         val_x_processed = []
         for line in val_x:
             val_x_processed.append(self.pattern.sub('', line))
 
+        #turning the validation set into vectors
         val_temp = [self.nlp(text) for text in val_x_processed]
         val_x_vectors = [x.vector for x in val_temp]
+
+        #getting the predicted labels for the validation set
         predictions = self.clf_svm.predict(val_x_vectors)
 
         return f1_score(predictions, val_y, average='macro')
@@ -153,15 +158,18 @@ class BagOfWordsClassifier:
         return train_x, train_y
 
     def initialiseBOWClassifier(self):
-        """ initialise and return a bag of words classifier """
+        """ initialise, train and return a bag of words classifier """
         self.pattern = re.compile(r'\b(' +r'|'.join(stopwords.words('english')) +r')\b\s')
         train_x_processed = []
         for line in self.train_x:
             train_x_processed.append(self.pattern.sub('', line))
  
+        #initialize tweet tokenizer to pass into the count vectorizer 
         tw_tokenizer = TweetTokenizer(strip_handles=True, reduce_len=True)
 
-        self.vectorizer = CountVectorizer( tokenizer=lambda text: tw_tokenizer.tokenize(text)) #deleted binary=True when running with abortion data
+        self.vectorizer = CountVectorizer(tokenizer=lambda text: tw_tokenizer.tokenize(text)) #deleted binary=True when running with abortion data
+
+        #the training set needs to be fit transformed before it is passed into the classifier
         train_x_vectors = self.vectorizer.fit_transform(train_x_processed)
 
         clf_svm = svm.SVC(kernel='linear')
@@ -181,12 +189,14 @@ class BagOfWordsClassifier:
         for line in val_x:
             val_x_processed.append(self.pattern.sub('', line))
         
+        #transforming the validation data and get the predicted labels
         val_x_vectors = self.vectorizer.transform(val_x_processed)
         predictions = self.clf_svm.predict(val_x_vectors)
 
         return f1_score(predictions, val_y, average = 'macro')
 
     def returnClassifier(self):
+        """ returns the fully trained classifier """
         return self.clf_svm
 
 class RandomForest:
@@ -209,14 +219,18 @@ class RandomForest:
         return train_x, train_y 
 
     def randomForest(self):
-        """ initialize and return a random forest classifier """
+        """ initialize, train and return a random forest classifier """
+
+        #delete stopwords
         self.pattern = re.compile(r'\b(' +r'|'.join(stopwords.words('english')) +r')\b\s')
         train_x_processed = []
         for line in self.train_x:
             train_x_processed.append(self.pattern.sub('', line))
 
+        #initialize an instance of the tweet tokenizer to pass into the countvectorizer
         tw_tokenizer = TweetTokenizer(strip_handles=True, reduce_len=True)
 
+        #fit transform the training data in order to pass it into the classifier
         self.vectorizer = CountVectorizer(tokenizer=lambda text: tw_tokenizer.tokenize(text)) #deleted binary=True when running with abortion data
         train_x_vectors = self.vectorizer.fit_transform(train_x_processed)
         rf_clf = RandomForestClassifier(criterion='entropy')
@@ -231,10 +245,12 @@ class RandomForest:
         with open(val_y_path, 'r') as infile:
             val_y = [int(line) for line in infile]
 
+        #delete stopwords
         val_x_processed = []
         for line in val_x:
             val_x_processed.append(self.pattern.sub('', line))
 
+        #transform the validation data and get the predicted labels
         val_x_vectors = self.vectorizer.transform(val_x_processed)
         predictions = self.rf_clf.predict(val_x_vectors)
 
@@ -258,30 +274,41 @@ class DecisionTree:
         return train_x, train_y 
 
     def decisionTree(self):
+        """ initialize, train and return a decision tree classifier """
+
+        #delete stopwords
         pattern = re.compile(r'\b(' +r'|'.join(stopwords.words('english')) +r')\b\s')
         train_x_processed = []
         for line in self.train_x:
             train_x_processed.append(pattern.sub('', line))
 
+        #initialize tweet tokenizer to pass into the vectorizer
         tw_tokenizer = TweetTokenizer(strip_handles=True, reduce_len=True)
 
         self.vectorizer = CountVectorizer(tokenizer=lambda text: tw_tokenizer.tokenize(text)) #deleted binary=True when running with abortion data
+        
+        #fit transform the training data using the vectorizer
         train_x_vectors = self.vectorizer.fit_transform(train_x_processed)
+
+        #initialize and train decision tree classifier
         dt_clf = DecisionTreeClassifier()
         dt_clf.fit(train_x_vectors, self.train_y)
         return dt_clf
 
     def getAccuracy(self, val_x_path, val_y_path):
+        """ returns the f1 score of the validation set """
         with open(val_x_path, 'r', encoding = 'utf-8') as infile:
             val_x = [line.strip() for line in infile]
 
         with open(val_y_path, 'r') as infile:
             val_y = [int(line) for line in infile]
 
+        #delete stopwords
         val_x_processed = []
         for line in val_x:
             val_x_processed.append(self.pattern.sub('', line))
 
+        #transform validation set and get predicted labels
         val_x_vectors = self.vectorizer.transform(val_x_processed)
         predictions = self.dt_clf.predict(val_x_vectors) 
 
