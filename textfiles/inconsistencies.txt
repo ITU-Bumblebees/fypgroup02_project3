@@ -1,0 +1,5 @@
+test set:
+tweet 113 & 139 (both use the word 'rapefugee' but are not classified as hate speech) 
+even though it is classified as hatespeech in 172
+
+also a lot of inconsistencies with words like "hoe", "bitch", "cunt" etc. basically any genedered insult. (187, 194)

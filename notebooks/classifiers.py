@@ -5,9 +5,12 @@ import re
 #sklearn imports
 from sklearn import svm
 from sklearn.feature_extraction.text import CountVectorizer 
-from sklearn.metrics import f1_score 
+from sklearn.metrics import accuracy_score, f1_score, balanced_accuracy_score, precision_score, recall_score
 from sklearn.ensemble import RandomForestClassifier 
 from sklearn.tree import DecisionTreeClassifier 
+from sklearn.linear_model import SGDClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler 
 
 #nltk imports
 from nltk.corpus import stopwords 
@@ -25,22 +28,26 @@ import spacy
 class WithStopVectorClassifier:
     """ The purpose of this class is to train a classifier using the spacy pipeline and a given train set,
     It does not remove stopwords. """
-    def __init__(self, train_text_path, train_labels_path):
+    def __init__(self, train_text_path, train_labels_path, already=False):
         """ initialize the self variables as well as get the training sets and the classifier"""
         self.train_text_path = train_text_path
         self.train_labels_path = train_labels_path
         self.nlp = spacy.load('en_core_web_lg')  #load in the pre-trained pipeline from spacy
-        self.train_x, self.train_y = self.getTrainSets()
+        self.train_x, self.train_y = self.getTrainSets(already)
         self.clf_svm = self.trainWordVector()
 
-    def getTrainSets(self):
+    def getTrainSets(self, already=False):
         """ load in the train data set, train_x has the text and train_y the labels """
-        with open(self.train_text_path, 'r', encoding='utf-8') as infile:
-            train_x = [line.strip() for line in infile]
+        if not already:
+            with open(self.train_text_path, 'r', encoding='utf-8') as infile:
+                train_x = [line.strip() for line in infile]
 
-        with open(self.train_labels_path, 'r') as infile:
-            train_y = [int(line) for line in infile]
-
+            with open(self.train_labels_path, 'r') as infile:
+                train_y = [int(line) for line in infile]
+        
+        else:
+            train_x = self.train_text_path
+            train_y = self.train_labels_path
         return train_x, train_y
 
     def trainWordVector(self):
@@ -59,19 +66,28 @@ class WithStopVectorClassifier:
         """ return the trained classifier """
         return self.clf_svm
 
-    def getClassifierAccuracy(self, val_x_path, val_y_path):
-        """ use the validation set to get the f1 score of the model """
-        with open(val_x_path, 'r', encoding= 'utf-8') as infile:
-            val_x = [line.strip() for line in infile]
+    def getClassifierAccuracy(self, val_x_path, val_y_path, already=False):
+        """ use the validation set to get the f1 score, balanced accuracy, recall and precision of the model """
+        if not already:
+            with open(val_x_path, 'r', encoding= 'utf-8') as infile:
+                val_x = [line.strip() for line in infile]
 
-        with open(val_y_path, 'r') as infile:
-            val_y = [int(line) for line in infile]
+            with open(val_y_path, 'r') as infile:
+                val_y = [int(line) for line in infile]
+        else:
+            val_x = val_x_path
+            val_y = val_y_path
         
         val_temp = [self.nlp(text) for text in val_x]
         val_x_vectors = [x.vector for x in val_temp]
         predictions = self.clf_svm.predict(val_x_vectors)
 
-        return f1_score(predictions, val_y, average='macro')
+        f1 = f1_score( val_y, predictions, average='macro')
+        acc = accuracy_score(val_y, predictions)
+        prec = precision_score(val_y, predictions, average = 'macro')
+        rec = recall_score(val_y, predictions, average = 'macro')
+
+        return f1, acc, prec, rec 
 
 class NoStopVectorClassifier:
     """ The purpose of this class is to train a classifier using the spacy pipeline and a given train set,
@@ -112,12 +128,18 @@ class NoStopVectorClassifier:
         clf_svm.fit(train_x_vectors, self.train_y)
         return clf_svm 
 
+        clf = make_pipeline(StandardScaler(), SGDClassifier(max_iter=1000, tol=1e-3))
+        clf.fit(train_x_vectors, self.train_y)
+        Pipeline(steps=[('standardscaler', StandardScaler()),
+                ('sgdclassifier', SGDClassifier())])
+        print(clf.predict([[-0.8, -1]]))
+
     def returnClassifier(self):
         """ return the trained classifier """
         return self.clf_svm
 
     def getClassifierAccuracy(self, val_x_path, val_y_path):
-        """ use the validation set to get the f1 score of the model """
+        """ use the validation set to get the f1 score, balanced accuracy, recall and precision of the model """
         with open(val_x_path, 'r', encoding= 'utf-8') as infile:
             val_x = [line.strip() for line in infile]
 
@@ -136,7 +158,12 @@ class NoStopVectorClassifier:
         #getting the predicted labels for the validation set
         predictions = self.clf_svm.predict(val_x_vectors)
 
-        return f1_score(predictions, val_y, average='macro')
+        f1 = f1_score( val_y, predictions, average='macro')
+        acc = accuracy_score(val_y, predictions)
+        prec = precision_score(val_y, predictions, average = 'macro')
+        rec = recall_score(val_y, predictions, average = 'macro')
+
+        return f1, acc, prec, rec 
 
 class BagOfWordsClassifier:
     """ The purpose of a class is to train a classifier using the bag of words method and a given train set,
@@ -177,7 +204,7 @@ class BagOfWordsClassifier:
         return clf_svm
 
     def getClassifierAccuracy(self, val_x_path, val_y_path):
-        """ use the validation set to get the f1 score for the classifier """
+        """ use the validation set to get the f1 score, balanced accuracy, recall and precision of the model """
         with open(val_x_path, 'r', encoding= 'utf-8') as infile:
             val_x = [line.strip() for line in infile]
 
@@ -193,7 +220,12 @@ class BagOfWordsClassifier:
         val_x_vectors = self.vectorizer.transform(val_x_processed)
         predictions = self.clf_svm.predict(val_x_vectors)
 
-        return f1_score(predictions, val_y, average = 'macro')
+        f1 = f1_score( val_y, predictions, average='macro')
+        acc = accuracy_score(val_y, predictions)
+        prec = precision_score(val_y, predictions, average = 'macro')
+        rec = recall_score(val_y, predictions, average = 'macro')
+
+        return f1, acc, prec, rec 
 
     def returnClassifier(self):
         """ returns the fully trained classifier """
@@ -237,8 +269,8 @@ class RandomForest:
         rf_clf.fit(train_x_vectors, self.train_y)
         return rf_clf
     
-    def getAccuracy(self, val_x_path, val_y_path):
-        """ use the validation set to get the f1 score of the classifier """
+    def getClassifierAccuracy(self, val_x_path, val_y_path):
+        """ use the validation set to get the f1 score, balanced accuracy, recall and precision of the model """
         with open(val_x_path, 'r', encoding= 'utf-8') as infile:
             val_x = [line.strip() for line in infile]
 
@@ -254,7 +286,12 @@ class RandomForest:
         val_x_vectors = self.vectorizer.transform(val_x_processed)
         predictions = self.rf_clf.predict(val_x_vectors)
 
-        return f1_score(predictions, val_y, average = 'macro')
+        f1 = f1_score( val_y, predictions, average='macro')
+        acc = accuracy_score(val_y, predictions)
+        prec = precision_score(val_y, predictions, average = 'macro')
+        rec = recall_score(val_y, predictions, average = 'macro')
+
+        return f1, acc, prec, rec 
 
 class DecisionTree:
     def __init__(self, train_text_path, train_labels_path):
@@ -277,10 +314,10 @@ class DecisionTree:
         """ initialize, train and return a decision tree classifier """
 
         #delete stopwords
-        pattern = re.compile(r'\b(' +r'|'.join(stopwords.words('english')) +r')\b\s')
+        self.pattern = re.compile(r'\b(' +r'|'.join(stopwords.words('english')) +r')\b\s')
         train_x_processed = []
         for line in self.train_x:
-            train_x_processed.append(pattern.sub('', line))
+            train_x_processed.append(self.pattern.sub('', line))
 
         #initialize tweet tokenizer to pass into the vectorizer
         tw_tokenizer = TweetTokenizer(strip_handles=True, reduce_len=True)
@@ -295,8 +332,8 @@ class DecisionTree:
         dt_clf.fit(train_x_vectors, self.train_y)
         return dt_clf
 
-    def getAccuracy(self, val_x_path, val_y_path):
-        """ returns the f1 score of the validation set """
+    def getClassifierAccuracy(self, val_x_path, val_y_path):
+        """ use the validation set to get the f1 score, balanced accuracy, recall and precision of the model """
         with open(val_x_path, 'r', encoding = 'utf-8') as infile:
             val_x = [line.strip() for line in infile]
 
@@ -312,5 +349,10 @@ class DecisionTree:
         val_x_vectors = self.vectorizer.transform(val_x_processed)
         predictions = self.dt_clf.predict(val_x_vectors) 
 
-        return f1_score(predictions, val_y, average = 'macro')
+        f1 = f1_score( val_y, predictions, average='macro')
+        acc = accuracy_score(val_y, predictions)
+        prec = precision_score(val_y, predictions, average = 'macro')
+        rec = recall_score(val_y, predictions, average = 'macro')
+
+        return f1, acc, prec, rec 
         
