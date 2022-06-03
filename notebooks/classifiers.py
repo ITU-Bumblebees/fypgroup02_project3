@@ -234,19 +234,23 @@ class BagOfWordsClassifier:
 class RandomForest:
     """ The purpose of this class is to train a random forest classifier with a train data set,
     It utilises the TweetTokenizer from nltk and there is stopword removal. """
-    def __init__(self, train_text_path, train_labels_path):
+    def __init__(self, train_text_path, train_labels_path, already=False):
         self.train_text_path = train_text_path
         self.train_labels_path = train_labels_path
-        self.train_x, self.train_y = self.getTrainSets()
+        self.train_x, self.train_y = self.getTrainSets(already)
         self.rf_clf = self.randomForest()
 
-    def getTrainSets(self):
+    def getTrainSets(self, already):
         """ get both the train text and the labels for the training set """
-        with open(self.train_text_path, 'r', encoding='utf-8') as infile:
-            train_x = [line.strip() for line in infile]
+        if not already:
+            with open(self.train_text_path, 'r', encoding='utf-8') as infile:
+                train_x = [line.strip() for line in infile]
 
-        with open(self.train_labels_path, 'r') as infile:
-            train_y = [int(line) for line in infile]
+            with open(self.train_labels_path, 'r') as infile:
+                train_y = [int(line) for line in infile]
+        else:
+            train_x = self.train_text_path
+            train_y = self.train_labels_path
 
         return train_x, train_y 
 
@@ -269,14 +273,18 @@ class RandomForest:
         rf_clf.fit(train_x_vectors, self.train_y)
         return rf_clf
     
-    def getClassifierAccuracy(self, val_x_path, val_y_path):
+    def getClassifierAccuracy(self, val_x_path, val_y_path, already=False):
         """ use the validation set to get the f1 score, balanced accuracy, recall and precision of the model """
-        with open(val_x_path, 'r', encoding= 'utf-8') as infile:
-            val_x = [line.strip() for line in infile]
+        if not already:
+            with open(val_x_path, 'r', encoding= 'utf-8') as infile:
+                val_x = [line.strip() for line in infile]
 
-        with open(val_y_path, 'r') as infile:
-            val_y = [int(line) for line in infile]
-
+            with open(val_y_path, 'r') as infile:
+                val_y = [int(line) for line in infile]
+        else:
+            val_x = val_x_path
+            val_y = val_y_path
+            
         #delete stopwords
         val_x_processed = []
         for line in val_x:
